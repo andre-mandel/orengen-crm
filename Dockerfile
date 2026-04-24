@@ -4,7 +4,7 @@ RUN apk add --no-cache libc6-compat openssl
 
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --fund=false
+RUN npm ci --include=dev --no-audit --fund=false
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
