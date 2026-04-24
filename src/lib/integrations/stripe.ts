@@ -1,3 +1,28 @@
+export async function findOrCreateCustomer(email: string) {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("Stripe not configured");
+
+  const headers = {
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  const searchRes = await fetch(
+    `https://api.stripe.com/v1/customers/search?query=email:'${encodeURIComponent(email)}'`,
+    { headers: { Authorization: `Bearer ${key}` } }
+  );
+  const searchData = await searchRes.json();
+
+  if (searchData.data?.length > 0) return searchData.data[0];
+
+  const createRes = await fetch("https://api.stripe.com/v1/customers", {
+    method: "POST",
+    headers,
+    body: new URLSearchParams({ email }),
+  });
+  return createRes.json();
+}
+
 export async function createInvoice(customerEmail: string, amount: number, description: string) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("Stripe not configured");
@@ -7,12 +32,18 @@ export async function createInvoice(customerEmail: string, amount: number, descr
     "Content-Type": "application/x-www-form-urlencoded",
   };
 
-  const customerRes = await fetch("https://api.stripe.com/v1/customers", {
+  const customer = await findOrCreateCustomer(customerEmail);
+
+  await fetch("https://api.stripe.com/v1/invoiceitems", {
     method: "POST",
     headers,
-    body: new URLSearchParams({ email: customerEmail }),
+    body: new URLSearchParams({
+      customer: customer.id,
+      amount: String(amount),
+      currency: "usd",
+      description,
+    }),
   });
-  const customer = await customerRes.json();
 
   const invoiceRes = await fetch("https://api.stripe.com/v1/invoices", {
     method: "POST",
@@ -23,19 +54,6 @@ export async function createInvoice(customerEmail: string, amount: number, descr
       days_until_due: "30",
     }),
   });
-  const invoice = await invoiceRes.json();
 
-  await fetch("https://api.stripe.com/v1/invoiceitems", {
-    method: "POST",
-    headers,
-    body: new URLSearchParams({
-      customer: customer.id,
-      invoice: invoice.id,
-      amount: String(amount),
-      currency: "usd",
-      description,
-    }),
-  });
-
-  return invoice;
+  return invoiceRes.json();
 }

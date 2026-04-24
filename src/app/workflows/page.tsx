@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Zap, Play, Pause, Plus, ArrowRight, Phone, Mail, Bot, Calendar, CreditCard, Mic } from "lucide-react";
+import { Zap, Play, Pause, Plus, ArrowRight, Mail, Bot, Calendar, CreditCard, Mic } from "lucide-react";
 import { clsx } from "clsx";
 
 type Workflow = {
