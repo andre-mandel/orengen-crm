@@ -1,18 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { Save, Palette, Globe, Key, Users } from "lucide-react";
+import { Save, Palette, Globe, Key, Users, Check } from "lucide-react";
+import { useTenant } from "@/components/TenantProvider";
 
 export default function SettingsPage() {
-  const [brandName, setBrandName] = useState(process.env.NEXT_PUBLIC_BRAND_NAME || "OrenGen");
-  const [brandColor, setBrandColor] = useState(process.env.NEXT_PUBLIC_BRAND_COLOR || "#6366f1");
-  const [domain, setDomain] = useState("app.orengen.io");
+  const { tenant, refresh } = useTenant();
+  const [brandName, setBrandName] = useState(tenant?.name || "OrenGen");
+  const [brandColor, setBrandColor] = useState(tenant?.brandColor || "#6366f1");
+  const [logo, setLogo] = useState(tenant?.logo || "");
+  const [domain, setDomain] = useState(tenant?.domain || "");
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSaving(true);
+    const res = await fetch("/api/tenant", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: brandName, brandColor, logo: logo || null, domain: domain || null }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setSaved(true);
+      refresh();
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
+
+  const inputClass = "w-full bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand";
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -26,40 +42,22 @@ export default function SettingsPage() {
           <Palette size={18} className="text-brand" />
           <h2 className="text-sm font-medium">Branding</h2>
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-xs text-text-secondary block mb-1">Brand Name</label>
-            <input
-              value={brandName}
-              onChange={(e) => setBrandName(e.target.value)}
-              className="w-full bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
-            />
+            <input value={brandName} onChange={(e) => setBrandName(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label className="text-xs text-text-secondary block mb-1">Brand Color</label>
             <div className="flex gap-2">
-              <input
-                type="color"
-                value={brandColor}
-                onChange={(e) => setBrandColor(e.target.value)}
-                className="w-10 h-10 rounded-lg border border-border cursor-pointer bg-transparent"
-              />
-              <input
-                value={brandColor}
-                onChange={(e) => setBrandColor(e.target.value)}
-                className="flex-1 bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
-              />
+              <input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="w-10 h-10 rounded-lg border border-border cursor-pointer bg-transparent" />
+              <input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className={`flex-1 ${inputClass.replace("w-full ", "")}`} />
             </div>
           </div>
         </div>
-
         <div>
           <label className="text-xs text-text-secondary block mb-1">Logo URL</label>
-          <input
-            placeholder="https://yourdomain.com/logo.png"
-            className="w-full bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
-          />
+          <input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://yourdomain.com/logo.png" className={inputClass} />
         </div>
       </div>
 
@@ -70,11 +68,7 @@ export default function SettingsPage() {
         </div>
         <div>
           <label className="text-xs text-text-secondary block mb-1">Custom Domain</label>
-          <input
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            className="w-full bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
-          />
+          <input value={domain} onChange={(e) => setDomain(e.target.value)} className={inputClass} />
         </div>
       </div>
 
@@ -83,23 +77,20 @@ export default function SettingsPage() {
           <Key size={18} className="text-brand" />
           <h2 className="text-sm font-medium">Integrations</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <p className="text-xs text-text-muted">Integration credentials are configured via environment variables on the server for security. Update them in your Coolify deployment settings.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { label: "Twilio Account SID", env: "TWILIO_ACCOUNT_SID" },
-            { label: "Twilio Auth Token", env: "TWILIO_AUTH_TOKEN" },
-            { label: "Stripe Secret Key", env: "STRIPE_SECRET_KEY" },
-            { label: "Cal.com API Key", env: "CALCOM_API_KEY" },
-            { label: "CrewAI API URL", env: "CREWAI_API_URL" },
-            { label: "VAPI API Key", env: "VAPI_API_KEY" },
-            { label: "n8n Webhook URL", env: "N8N_WEBHOOK_URL" },
-          ].map((field) => (
-            <div key={field.env}>
-              <label className="text-xs text-text-secondary block mb-1">{field.label}</label>
-              <input
-                type="password"
-                placeholder={field.env}
-                className="w-full bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
-              />
+            { label: "Twilio", env: "TWILIO_ACCOUNT_SID", set: !!process.env.NEXT_PUBLIC_HAS_TWILIO },
+            { label: "Stripe", env: "STRIPE_SECRET_KEY", set: !!process.env.NEXT_PUBLIC_HAS_STRIPE },
+            { label: "Cal.com", env: "CALCOM_API_KEY", set: !!process.env.NEXT_PUBLIC_HAS_CALCOM },
+            { label: "CrewAI", env: "CREWAI_API_URL", set: !!process.env.NEXT_PUBLIC_HAS_CREWAI },
+            { label: "VAPI", env: "VAPI_API_KEY", set: !!process.env.NEXT_PUBLIC_HAS_VAPI },
+            { label: "n8n", env: "N8N_WEBHOOK_URL", set: !!process.env.NEXT_PUBLIC_HAS_N8N },
+          ].map((svc) => (
+            <div key={svc.env} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-overlay text-sm">
+              <div className={`w-2 h-2 rounded-full ${svc.set ? "bg-emerald-400" : "bg-text-muted"}`} />
+              <span>{svc.label}</span>
+              <span className="text-xs text-text-muted ml-auto">{svc.set ? "Connected" : "Not set"}</span>
             </div>
           ))}
         </div>
@@ -118,10 +109,11 @@ export default function SettingsPage() {
 
       <button
         onClick={handleSave}
-        className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-brand hover:opacity-90 transition-all"
+        disabled={saving}
+        className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-brand hover:opacity-90 transition-all disabled:opacity-50"
       >
-        <Save size={16} />
-        {saved ? "Saved!" : "Save Changes"}
+        {saved ? <Check size={16} /> : <Save size={16} />}
+        {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
       </button>
     </div>
   );

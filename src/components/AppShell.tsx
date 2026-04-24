@@ -1,19 +1,25 @@
 "use client";
 
-import { useState } from "react";
 import Sidebar from "./Sidebar";
-
-const DEFAULT_BRAND = {
-  name: process.env.NEXT_PUBLIC_BRAND_NAME || "OrenGen",
-  color: process.env.NEXT_PUBLIC_BRAND_COLOR || "#6366f1",
-};
+import { useTenant } from "./TenantProvider";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [brand] = useState(DEFAULT_BRAND);
+  const { tenant, loading } = useTenant();
+
+  const brandName = tenant?.name || "OrenGen";
+  const brandColor = tenant?.brandColor || "#6366f1";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ "--brand-color": brand.color } as React.CSSProperties}>
-      <Sidebar brandName={brand.name} brandColor={brand.color} />
+    <div style={{ "--brand-color": brandColor } as React.CSSProperties}>
+      <Sidebar brandName={brandName} brandColor={brandColor} />
       <main className="ml-56 min-h-screen p-6">{children}</main>
     </div>
   );

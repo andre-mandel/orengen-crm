@@ -1,28 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getDefaultTenantId } from "@/lib/tenant";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const tenantId = req.headers.get("x-tenant-id");
-    if (!tenantId) return NextResponse.json({ error: "Missing tenant" }, { status: 400 });
-
+    const tenantId = await getDefaultTenantId();
     const contacts = await prisma.contact.findMany({
       where: { tenantId },
-      include: { deals: true },
+      include: { deals: { select: { id: true, value: true } } },
       orderBy: { createdAt: "desc" },
     });
-
     return NextResponse.json(contacts);
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const tenantId = req.headers.get("x-tenant-id");
-    if (!tenantId) return NextResponse.json({ error: "Missing tenant" }, { status: 400 });
-
+    const tenantId = await getDefaultTenantId();
     const body = await req.json();
     if (!body.name?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
@@ -38,9 +34,19 @@ export async function POST(req: NextRequest) {
         tenantId,
       },
     });
-
     return NextResponse.json(contact, { status: 201 });
-  } catch (e) {
+  } catch {
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+    await prisma.contact.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch {
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

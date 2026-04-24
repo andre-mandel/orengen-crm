@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
+import TenantProvider from "@/components/TenantProvider";
 
 export const metadata: Metadata = {
   title: "OrenGen CRM",
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-full">
-        <AppShell>{children}</AppShell>
+        <TenantProvider>
+          <AppShell>{children}</AppShell>
+        </TenantProvider>
       </body>
     </html>
   );

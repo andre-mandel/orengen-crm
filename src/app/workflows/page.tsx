@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Zap, Play, Pause, Plus, ArrowRight, Mail, Bot, Calendar, CreditCard, Mic } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -8,74 +8,59 @@ type Workflow = {
   id: string;
   name: string;
   trigger: string;
-  triggerIcon: typeof Zap;
   actions: string[];
   active: boolean;
-  runs: number;
-  lastRun: string;
+  _count: { runs: number };
+  createdAt: string;
 };
 
-const demoWorkflows: Workflow[] = [
-  {
-    id: "w1",
-    name: "New Lead → SMS + CRM",
-    trigger: "New contact form submission",
-    triggerIcon: Mail,
-    actions: ["Add to CRM pipeline", "Send Twilio SMS welcome", "Trigger n8n lead score"],
-    active: true,
-    runs: 142,
-    lastRun: "5m ago",
-  },
-  {
-    id: "w2",
-    name: "Booking Confirmed → Prep",
-    trigger: "Cal.com booking created",
-    triggerIcon: Calendar,
-    actions: ["Create task in CRM", "Send SMS reminder", "Notify Slack"],
-    active: true,
-    runs: 89,
-    lastRun: "2h ago",
-  },
-  {
-    id: "w3",
-    name: "Deal Won → Invoice",
-    trigger: "Deal moved to Closed Won",
-    triggerIcon: CreditCard,
-    actions: ["Create Stripe invoice", "Send welcome email", "Update analytics"],
-    active: true,
-    runs: 34,
-    lastRun: "1d ago",
-  },
-  {
-    id: "w4",
-    name: "VAPI Call → Follow Up",
-    trigger: "VAPI call completed",
-    triggerIcon: Mic,
-    actions: ["Log call in CRM", "CrewAI sentiment analysis", "Schedule follow-up task"],
-    active: false,
-    runs: 12,
-    lastRun: "3d ago",
-  },
-  {
-    id: "w5",
-    name: "Lead Score → Assign",
-    trigger: "CrewAI lead score complete",
-    triggerIcon: Bot,
-    actions: ["Update contact score", "Auto-assign to rep", "Send personalized SMS"],
-    active: true,
-    runs: 67,
-    lastRun: "30m ago",
-  },
-];
+const triggerIcons: Record<string, typeof Zap> = {
+  "contact.created": Mail,
+  "calcom.booking.created": Calendar,
+  "deal.closed_won": CreditCard,
+  "vapi.call.completed": Mic,
+  "crewai.score.complete": Bot,
+};
+
+const triggerLabels: Record<string, string> = {
+  "contact.created": "New contact form submission",
+  "calcom.booking.created": "Cal.com booking created",
+  "deal.closed_won": "Deal moved to Closed Won",
+  "vapi.call.completed": "VAPI call completed",
+  "crewai.score.complete": "CrewAI lead score complete",
+  manual: "Manual trigger",
+};
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState(demoWorkflows);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleActive = (id: string) => {
-    setWorkflows((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, active: !w.active } : w))
-    );
+  const load = useCallback(() => {
+    fetch("/api/workflows")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setWorkflows(data); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleActive = async (id: string, current: boolean) => {
+    setWorkflows((prev) => prev.map((w) => (w.id === id ? { ...w, active: !current } : w)));
+    await fetch("/api/workflows", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, active: !current }),
+    });
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold">Workflows</h1>
+        <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="stat-card h-20 animate-pulse" />)}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -93,36 +78,31 @@ export default function WorkflowsPage() {
 
       <div className="space-y-3">
         {workflows.map((wf) => {
-          const TriggerIcon = wf.triggerIcon;
+          const TriggerIcon = triggerIcons[wf.trigger] || Zap;
+          const triggerLabel = triggerLabels[wf.trigger] || wf.trigger;
+          const actions = Array.isArray(wf.actions) ? wf.actions : [];
           return (
             <div
               key={wf.id}
-              className={clsx(
-                "stat-card flex items-center gap-4 transition-opacity",
-                !wf.active && "opacity-50"
-              )}
+              className={clsx("stat-card flex items-center gap-4 transition-opacity", !wf.active && "opacity-50")}
             >
               <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
                 <Zap size={18} className="text-brand" />
               </div>
-
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">{wf.name}</p>
                 <div className="flex items-center gap-1.5 mt-1 text-xs text-text-secondary">
                   <TriggerIcon size={12} />
-                  <span>{wf.trigger}</span>
+                  <span>{triggerLabel}</span>
                   <ArrowRight size={10} className="text-text-muted" />
-                  <span>{wf.actions.length} actions</span>
+                  <span>{actions.length} actions</span>
                 </div>
               </div>
-
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium">{wf.runs} runs</p>
-                <p className="text-xs text-text-muted">Last: {wf.lastRun}</p>
+                <p className="text-sm font-medium">{wf._count.runs} runs</p>
               </div>
-
               <button
-                onClick={() => toggleActive(wf.id)}
+                onClick={() => toggleActive(wf.id, wf.active)}
                 className={clsx(
                   "w-9 h-9 rounded-lg flex items-center justify-center transition-colors",
                   wf.active
@@ -135,6 +115,9 @@ export default function WorkflowsPage() {
             </div>
           );
         })}
+        {workflows.length === 0 && (
+          <div className="stat-card text-center py-8 text-text-muted">No workflows yet</div>
+        )}
       </div>
     </div>
   );
