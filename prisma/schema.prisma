@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  logo       String?
+  brandColor String   @default("#6366f1")
+  domain     String?  @unique
+  createdAt  DateTime @default(now())
+  users      User[]
+  contacts   Contact[]
+  deals      Deal[]
+  tasks      Task[]
+  workflows  Workflow[]
+  pipelines  Pipeline[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  password  String?
+  role      Role     @default(MEMBER)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tasks     Task[]   @relation("assignee")
+  deals     Deal[]   @relation("dealOwner")
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VA
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  company   String?
+  source    String?
+  tags      String[] @default([])
+  notes     String?
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  deals     Deal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model Pipeline {
+  id        String   @id @default(cuid())
+  name      String
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  stages    Stage[]
+  deals     Deal[]
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Stage {
+  id         String   @id @default(cuid())
+  name       String
+  order      Int
+  color      String   @default("#6366f1")
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+
+  @@index([pipelineId])
+}
+
+model Deal {
+  id         String    @id @default(cuid())
+  title      String
+  value      Float     @default(0)
+  currency   String    @default("USD")
+  stageId    String
+  stage      Stage     @relation(fields: [stageId], references: [id])
+  pipelineId String
+  pipeline   Pipeline  @relation(fields: [pipelineId], references: [id])
+  contactId  String?
+  contact    Contact?  @relation(fields: [contactId], references: [id])
+  ownerId    String?
+  owner      User?     @relation("dealOwner", fields: [ownerId], references: [id])
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  notes      String?
+  closedAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([stageId])
+  @@index([pipelineId])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  assigneeId  String?
+  assignee    User?      @relation("assignee", fields: [assigneeId], references: [id])
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Workflow {
+  id        String        @id @default(cuid())
+  name      String
+  trigger   String
+  actions   Json
+  active    Boolean       @default(true)
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  runs      WorkflowRun[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([tenantId])
+}
+
+model WorkflowRun {
+  id         String    @id @default(cuid())
+  workflowId String
+  workflow   Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status     String
+  input      Json?
+  output     Json?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
