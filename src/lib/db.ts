@@ -1,14 +1,14 @@
 import { PrismaClient } from "@/generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 let prismaInstance: PrismaClient | null = null;
 
 export function getPrisma(): PrismaClient {
   if (!prismaInstance) {
-    prismaInstance = new (PrismaClient as new (opts?: Record<string, unknown>) => PrismaClient)({
-      datasources: {
-        db: { url: process.env.DATABASE_URL },
-      },
-    });
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL is not set");
+    const adapter = new PrismaPg(url);
+    prismaInstance = new PrismaClient({ adapter });
   }
   return prismaInstance;
 }
