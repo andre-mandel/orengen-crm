@@ -33,4 +33,4 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 USER nextjs
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy 2>/dev/null; npx tsx prisma/seed.ts 2>/dev/null; npm start"]
+CMD ["sh", "-c", "npx prisma migrate deploy 2>/dev/null; npm start"]
