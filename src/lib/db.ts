@@ -4,7 +4,11 @@ let prismaInstance: PrismaClient | null = null;
 
 export function getPrisma(): PrismaClient {
   if (!prismaInstance) {
-    prismaInstance = new PrismaClient();
+    prismaInstance = new (PrismaClient as new (opts?: Record<string, unknown>) => PrismaClient)({
+      datasources: {
+        db: { url: process.env.DATABASE_URL },
+      },
+    });
   }
   return prismaInstance;
 }
