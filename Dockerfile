@@ -9,6 +9,7 @@ RUN npm ci --include=dev --no-audit --fund=false
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p public
 ENV DATABASE_URL="postgresql://placeholder:5432/placeholder"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
